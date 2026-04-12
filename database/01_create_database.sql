@@ -1,0 +1,14 @@
+IF DB_ID('VotingDApp') IS NULL
+BEGIN
+    CREATE DATABASE VotingDApp;
+END;
+GO
+
+USE VotingDApp;
+GO
+
+IF SCHEMA_ID('voting') IS NULL
+BEGIN
+    EXEC('CREATE SCHEMA voting');
+END;
+GO

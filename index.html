@@ -1,0 +1,98 @@
+
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ứng dụng Bầu cử - Minh bạch</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <div class="bg-shape bg-shape-1"></div>
+    <div class="bg-shape bg-shape-2"></div>
+
+    <div id="loadingOverlay" class="loading-overlay hidden" aria-live="polite">
+      <div class="spinner"></div>
+      <p id="loadingText">Đang chờ giao dịch trên blockchain...</p>
+    </div>
+
+    <header class="container hero">
+      <div>
+        <p class="eyebrow">Ứng dụng Bầu cử</p>
+        <h1>Hệ thống Bầu cử minh bạch</h1>
+        <p class="subtitle">Quản trị bởi Ban tổ chức, bỏ phiếu bởi Cử tri, và kiểm chứng kết quả trên blockchain.</p>
+      </div>
+      <button id="connectWalletBtn" class="btn btn-primary">Kết nối ví MetaMask</button>
+    </header>
+
+    <main class="container grid-layout">
+      <section class="panel status-panel">
+        <h2>Trạng thái hệ thống</h2>
+        <div class="status-list">
+          <p><strong>Ví hiện tại:</strong> <span id="walletAddress">Chưa kết nối</span></p>
+          <p><strong>Vai trò:</strong> <span id="roleBadge" class="badge">Khách</span></p>
+          <p><strong>Trạng thái bầu cử:</strong> <span id="electionStatus">Chưa bắt đầu</span></p>
+          <p><strong>Thời gian còn lại:</strong> <span id="countdown">--:--</span></p>
+        </div>
+        <div class="sync-row">
+          <button id="checkBackendBtn" class="btn btn-secondary" type="button">Kiểm tra API</button>
+          <button id="syncDbBtn" class="btn btn-primary" type="button">Đồng bộ CSDL</button>
+        </div>
+        <p id="backendStatus" class="tiny-text">API backend: chưa kiểm tra</p>
+        <p id="globalMessage" class="notice" role="status"></p>
+      </section>
+
+      <section id="adminSection" class="panel hidden">
+        <h2>Chế độ Quản trị</h2>
+
+        <form id="whitelistForm" class="form-block">
+          <h3>Nhập whitelist cử tri</h3>
+          <label for="whitelistInput">Danh sách địa chỉ (mỗi dòng 1 địa chỉ)</label>
+          <textarea id="whitelistInput" rows="6" placeholder="0x123...&#10;0xabc..."></textarea>
+          <button type="submit" class="btn btn-secondary">Nạp whitelist</button>
+        </form>
+
+        <form id="candidateForm" class="form-block">
+          <h3>Thêm ứng cử viên</h3>
+          <div class="field-row">
+            <div>
+              <label for="candidateId">ID ứng cử viên</label>
+              <input id="candidateId" type="number" min="1" placeholder="1" required />
+            </div>
+            <div>
+              <label for="candidateName">Tên ứng cử viên</label>
+              <input id="candidateName" type="text" placeholder="Nguyen Van A" required />
+            </div>
+          </div>
+          <label for="candidateImage">URL hình ảnh</label>
+          <input id="candidateImage" type="url" placeholder="https://..." required />
+          <button type="submit" class="btn btn-secondary">Thêm ứng cử viên</button>
+        </form>
+
+        <div class="form-block">
+          <h3>Điều khiển bầu cử</h3>
+          <label for="durationInput">Thời gian bầu cử (phút)</label>
+          <input id="durationInput" type="number" min="1" value="5" />
+          <div class="action-row">
+            <button id="startElectionBtn" class="btn btn-success" type="button">Bắt đầu bầu cử</button>
+            <button id="endElectionBtn" class="btn btn-danger" type="button">Kết thúc bầu cử</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="voterSection" class="panel">
+        <h2>Chế độ Cử tri</h2>
+        <p id="whitelistMessage" class="notice hidden"></p>
+        <div id="candidatesContainer" class="cards-grid"></div>
+      </section>
+
+      <section id="resultsSection" class="panel hidden">
+        <h2>Kết quả bầu cử</h2>
+        <div id="resultsContainer" class="results-list"></div>
+      </section>
+    </main>
+
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>
+  
