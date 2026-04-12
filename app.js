@@ -180,6 +180,9 @@ function enforceSingleContract(address, lockConfig = {}) {
   const overrideKey = lockConfig.overrideKey || LOCK_OVERRIDE_KEY_DEFAULT;
   const locked = localStorage.getItem(storageKey);
   const allowOverride = localStorage.getItem(overrideKey) === "true";
+  const previousAddresses = Array.isArray(lockConfig.previousAddresses)
+    ? lockConfig.previousAddresses.map((item) => String(item).toLowerCase())
+    : [];
 
   if (!locked) {
     localStorage.setItem(storageKey, address);
@@ -187,6 +190,12 @@ function enforceSingleContract(address, lockConfig = {}) {
   }
 
   if (locked.toLowerCase() === address.toLowerCase()) {
+    return;
+  }
+
+  // Allow safe migration from known old contract addresses after a planned upgrade.
+  if (previousAddresses.includes(locked.toLowerCase())) {
+    localStorage.setItem(storageKey, address);
     return;
   }
 

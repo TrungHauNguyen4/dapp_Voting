@@ -574,7 +574,10 @@
   "lock": {
     "enabled": true,
     "storageKey": "votingdapp.lockedContractAddress",
-    "overrideKey": "votingdapp.allowAddressOverride"
+    "overrideKey": "votingdapp.allowAddressOverride",
+    "previousAddresses": [
+      "0x75F742480a242278553E41dAe94e478a35fD2C88"
+    ]
   },
   "sync": {
     "startBlock": 10630000
