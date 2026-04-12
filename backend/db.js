@@ -42,29 +42,29 @@ export async function upsertElection(pool, election) {
   request.input("EndTimeUtc", sql.DateTime2, election.endTimeUtc);
 
   const query = `
-MERGE voting.Elections AS target
+MERGE voting.DotBauCu AS target
 USING (SELECT @ContractAddress AS ContractAddress, @ChainId AS ChainId) AS source
-ON target.ContractAddress = source.ContractAddress AND target.ChainId = source.ChainId
+ON target.DiaChiHopDong = source.ContractAddress AND target.MaMang = source.ChainId
 WHEN MATCHED THEN
   UPDATE SET
-    AdminAddress = @AdminAddress,
-    State = @State,
-    StartTimeUtc = @StartTimeUtc,
-    EndTimeUtc = @EndTimeUtc
+    DiaChiQuanTri = @AdminAddress,
+    TrangThai = @State,
+    BatDauLucUtc = @StartTimeUtc,
+    KetThucLucUtc = @EndTimeUtc
 WHEN NOT MATCHED THEN
-  INSERT (ContractAddress, ChainId, AdminAddress, State, StartTimeUtc, EndTimeUtc)
+  INSERT (DiaChiHopDong, MaMang, DiaChiQuanTri, TrangThai, BatDauLucUtc, KetThucLucUtc)
   VALUES (@ContractAddress, @ChainId, @AdminAddress, @State, @StartTimeUtc, @EndTimeUtc)
-OUTPUT inserted.ElectionId;
+OUTPUT inserted.MaDotBauCu;
 `;
 
   const result = await request.query(query);
-  return result.recordset[0].ElectionId;
+  return result.recordset[0].MaDotBauCu;
 }
 
 export async function replaceCandidates(pool, electionId, candidates) {
   await pool.request()
     .input("ElectionId", sql.UniqueIdentifier, electionId)
-    .query("DELETE FROM voting.Candidates WHERE ElectionId = @ElectionId");
+    .query("DELETE FROM voting.UngCuVien WHERE MaDotBauCu = @ElectionId");
 
   for (const c of candidates) {
     await pool.request()
@@ -74,7 +74,7 @@ export async function replaceCandidates(pool, electionId, candidates) {
       .input("ImageUrl", sql.NVarChar(1000), c.image || "")
       .input("VoteCount", sql.BigInt, c.voteCount)
       .query(`
-INSERT INTO voting.Candidates (ElectionId, CandidateId, CandidateName, ImageUrl, VoteCount)
+INSERT INTO voting.UngCuVien (MaDotBauCu, MaUngCuVien, TenUngCuVien, AnhUrl, SoPhieu)
 VALUES (@ElectionId, @CandidateId, @CandidateName, @ImageUrl, @VoteCount)
 `);
   }
@@ -87,13 +87,13 @@ export async function upsertSyncState(pool, chainId, contractAddress, blockNumbe
   request.input("LastScannedBlock", sql.BigInt, blockNumber);
 
   await request.query(`
-MERGE voting.SyncState AS target
+MERGE voting.TrangThaiDongBo AS target
 USING (SELECT @ChainId AS ChainId, @ContractAddress AS ContractAddress) AS source
-ON target.ChainId = source.ChainId AND target.ContractAddress = source.ContractAddress
+ON target.MaMang = source.ChainId AND target.DiaChiHopDong = source.ContractAddress
 WHEN MATCHED THEN
-  UPDATE SET LastScannedBlock = @LastScannedBlock, LastUpdatedAtUtc = SYSUTCDATETIME()
+  UPDATE SET KhoiDaQuet = @LastScannedBlock, CapNhatLucUtc = SYSUTCDATETIME()
 WHEN NOT MATCHED THEN
-  INSERT (ChainId, ContractAddress, LastScannedBlock)
+  INSERT (MaMang, DiaChiHopDong, KhoiDaQuet)
   VALUES (@ChainId, @ContractAddress, @LastScannedBlock);
 `);
 }
@@ -103,13 +103,13 @@ export async function getSyncState(pool, chainId, contractAddress) {
     .input("ChainId", sql.Int, chainId)
     .input("ContractAddress", sql.NVarChar(42), contractAddress.toLowerCase())
     .query(`
-SELECT TOP 1 LastScannedBlock
-FROM voting.SyncState
-WHERE ChainId = @ChainId AND ContractAddress = @ContractAddress
+SELECT TOP 1 KhoiDaQuet
+FROM voting.TrangThaiDongBo
+WHERE MaMang = @ChainId AND DiaChiHopDong = @ContractAddress
 `);
 
   if (result.recordset.length === 0) return null;
-  return Number(result.recordset[0].LastScannedBlock);
+  return Number(result.recordset[0].KhoiDaQuet);
 }
 
 export async function insertEventLog(pool, logRow) {
@@ -124,8 +124,8 @@ export async function insertEventLog(pool, logRow) {
     .input("PayloadJson", sql.NVarChar(sql.MAX), JSON.stringify(logRow.payload || {}))
     .query(`
 BEGIN TRY
-    INSERT INTO voting.EventLogs
-    (ElectionId, ContractAddress, ChainId, EventName, TransactionHash, BlockNumber, LogIndex, PayloadJson)
+    INSERT INTO voting.NhatKySuKien
+    (MaDotBauCu, DiaChiHopDong, MaMang, TenSuKien, MaGiaoDich, SoKhoi, ChiSoLog, DuLieuJson)
     VALUES
     (@ElectionId, @ContractAddress, @ChainId, @EventName, @TransactionHash, @BlockNumber, @LogIndex, @PayloadJson)
 END TRY
@@ -144,7 +144,7 @@ export async function upsertVote(pool, voteRow) {
     .input("BlockNumber", sql.BigInt, voteRow.blockNumber)
     .query(`
 BEGIN TRY
-    INSERT INTO voting.Votes (ElectionId, VoterAddress, CandidateId, TransactionHash, BlockNumber)
+    INSERT INTO voting.PhieuBau (MaDotBauCu, DiaChiCuTri, MaUngCuVien, MaGiaoDich, SoKhoi)
     VALUES (@ElectionId, @VoterAddress, @CandidateId, @TransactionHash, @BlockNumber)
 END TRY
 BEGIN CATCH
@@ -160,7 +160,7 @@ export async function upsertWhitelist(pool, whitelistRow) {
     .input("RegisteredBy", sql.NVarChar(42), whitelistRow.registeredBy?.toLowerCase() || null)
     .query(`
 BEGIN TRY
-    INSERT INTO voting.Whitelist (ElectionId, WalletAddress, RegisteredBy)
+    INSERT INTO voting.DanhSachTrang (MaDotBauCu, DiaChiVi, DangKyBoi)
     VALUES (@ElectionId, @WalletAddress, @RegisteredBy)
 END TRY
 BEGIN CATCH
@@ -170,6 +170,6 @@ END CATCH
 }
 
 export async function getElectionSummaries(pool) {
-  const result = await pool.request().query("SELECT * FROM voting.vwElectionSummary ORDER BY CreatedAtUtc DESC");
+  const result = await pool.request().query("SELECT * FROM voting.vwTongHopBauCu ORDER BY CreatedAtUtc DESC");
   return result.recordset;
 }

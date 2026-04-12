@@ -1,132 +1,107 @@
 USE VotingDApp;
 GO
 
-IF OBJECT_ID('voting.Elections', 'U') IS NULL
-BEGIN
-    CREATE TABLE voting.Elections (
-        ElectionId UNIQUEIDENTIFIER NOT NULL DEFAULT NEWID(),
-        ContractAddress NVARCHAR(42) NOT NULL,
-        ChainId INT NOT NULL,
-        AdminAddress NVARCHAR(42) NOT NULL,
-        Name NVARCHAR(200) NULL,
-        Description NVARCHAR(1000) NULL,
-        State NVARCHAR(20) NOT NULL,
-        StartTimeUtc DATETIME2 NULL,
-        EndTimeUtc DATETIME2 NULL,
-        CreatedAtUtc DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
-        LastSyncedBlock BIGINT NULL,
-        CONSTRAINT PK_Elections PRIMARY KEY (ElectionId),
-        CONSTRAINT CK_Elections_State CHECK (State IN ('Created', 'Voting', 'Ended')),
-        CONSTRAINT UQ_Elections_Contract_Chain UNIQUE (ContractAddress, ChainId)
-    );
-END;
+DROP TABLE IF EXISTS voting.PhieuBau;
+DROP TABLE IF EXISTS voting.DanhSachTrang;
+DROP TABLE IF EXISTS voting.UngCuVien;
+DROP TABLE IF EXISTS voting.NhatKySuKien;
+DROP TABLE IF EXISTS voting.TrangThaiDongBo;
+DROP TABLE IF EXISTS voting.DotBauCu;
 GO
 
-IF OBJECT_ID('voting.Candidates', 'U') IS NULL
-BEGIN
-    CREATE TABLE voting.Candidates (
-        CandidateRowId BIGINT IDENTITY(1,1) NOT NULL,
-        ElectionId UNIQUEIDENTIFIER NOT NULL,
-        CandidateId INT NOT NULL,
-        CandidateName NVARCHAR(200) NOT NULL,
-        ImageUrl NVARCHAR(1000) NULL,
-        VoteCount BIGINT NOT NULL DEFAULT 0,
-        CreatedAtUtc DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
-        CONSTRAINT PK_Candidates PRIMARY KEY (CandidateRowId),
-        CONSTRAINT FK_Candidates_Elections FOREIGN KEY (ElectionId)
-            REFERENCES voting.Elections(ElectionId) ON DELETE CASCADE,
-        CONSTRAINT UQ_Candidates_Election_CandidateId UNIQUE (ElectionId, CandidateId)
-    );
-END;
+CREATE TABLE voting.DotBauCu (
+    MaDotBauCu UNIQUEIDENTIFIER NOT NULL DEFAULT NEWID(),
+    DiaChiHopDong NVARCHAR(42) NOT NULL,
+    MaMang INT NOT NULL,
+    DiaChiQuanTri NVARCHAR(42) NOT NULL,
+    TenDot NVARCHAR(200) NULL,
+    MoTa NVARCHAR(1000) NULL,
+    TrangThai NVARCHAR(20) NOT NULL,
+    BatDauLucUtc DATETIME2 NULL,
+    KetThucLucUtc DATETIME2 NULL,
+    TaoLucUtc DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+    BlockDongBoGanNhat BIGINT NULL,
+    CONSTRAINT PK_DotBauCu PRIMARY KEY (MaDotBauCu),
+    CONSTRAINT CK_DotBauCu_TrangThai CHECK (TrangThai IN ('Created', 'Voting', 'Ended')),
+    CONSTRAINT UQ_DotBauCu_HopDong_Mang UNIQUE (DiaChiHopDong, MaMang)
+);
 GO
 
-IF OBJECT_ID('voting.Whitelist', 'U') IS NULL
-BEGIN
-    CREATE TABLE voting.Whitelist (
-        WhitelistId BIGINT IDENTITY(1,1) NOT NULL,
-        ElectionId UNIQUEIDENTIFIER NOT NULL,
-        WalletAddress NVARCHAR(42) NOT NULL,
-        RegisteredAtUtc DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
-        RegisteredBy NVARCHAR(42) NULL,
-        CONSTRAINT PK_Whitelist PRIMARY KEY (WhitelistId),
-        CONSTRAINT FK_Whitelist_Elections FOREIGN KEY (ElectionId)
-            REFERENCES voting.Elections(ElectionId) ON DELETE CASCADE,
-        CONSTRAINT UQ_Whitelist_Election_Wallet UNIQUE (ElectionId, WalletAddress)
-    );
-END;
+CREATE TABLE voting.UngCuVien (
+    MaDongUngCuVien BIGINT IDENTITY(1,1) NOT NULL,
+    MaDotBauCu UNIQUEIDENTIFIER NOT NULL,
+    MaUngCuVien INT NOT NULL,
+    TenUngCuVien NVARCHAR(200) NOT NULL,
+    AnhUrl NVARCHAR(1000) NULL,
+    SoPhieu BIGINT NOT NULL DEFAULT 0,
+    TaoLucUtc DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+    CONSTRAINT PK_UngCuVien PRIMARY KEY (MaDongUngCuVien),
+    CONSTRAINT FK_UngCuVien_DotBauCu FOREIGN KEY (MaDotBauCu)
+        REFERENCES voting.DotBauCu(MaDotBauCu) ON DELETE CASCADE,
+    CONSTRAINT UQ_UngCuVien_Dot_Ma UNIQUE (MaDotBauCu, MaUngCuVien)
+);
 GO
 
-IF OBJECT_ID('voting.Votes', 'U') IS NULL
-BEGIN
-    CREATE TABLE voting.Votes (
-        VoteId BIGINT IDENTITY(1,1) NOT NULL,
-        ElectionId UNIQUEIDENTIFIER NOT NULL,
-        VoterAddress NVARCHAR(42) NOT NULL,
-        CandidateId INT NOT NULL,
-        TransactionHash NVARCHAR(66) NOT NULL,
-        BlockNumber BIGINT NOT NULL,
-        VotedAtUtc DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
-        CONSTRAINT PK_Votes PRIMARY KEY (VoteId),
-        CONSTRAINT FK_Votes_Elections FOREIGN KEY (ElectionId)
-            REFERENCES voting.Elections(ElectionId) ON DELETE CASCADE,
-        CONSTRAINT FK_Votes_Candidates FOREIGN KEY (ElectionId, CandidateId)
-            REFERENCES voting.Candidates(ElectionId, CandidateId),
-        CONSTRAINT UQ_Votes_Election_Voter UNIQUE (ElectionId, VoterAddress),
-        CONSTRAINT UQ_Votes_TxHash UNIQUE (TransactionHash)
-    );
-END;
+CREATE TABLE voting.DanhSachTrang (
+    MaTrang BIGINT IDENTITY(1,1) NOT NULL,
+    MaDotBauCu UNIQUEIDENTIFIER NOT NULL,
+    DiaChiVi NVARCHAR(42) NOT NULL,
+    DangKyLucUtc DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+    DangKyBoi NVARCHAR(42) NULL,
+    CONSTRAINT PK_DanhSachTrang PRIMARY KEY (MaTrang),
+    CONSTRAINT FK_DanhSachTrang_DotBauCu FOREIGN KEY (MaDotBauCu)
+        REFERENCES voting.DotBauCu(MaDotBauCu) ON DELETE CASCADE,
+    CONSTRAINT UQ_DanhSachTrang_Dot_Vi UNIQUE (MaDotBauCu, DiaChiVi)
+);
 GO
 
-IF OBJECT_ID('voting.EventLogs', 'U') IS NULL
-BEGIN
-    CREATE TABLE voting.EventLogs (
-        EventLogId BIGINT IDENTITY(1,1) NOT NULL,
-        ElectionId UNIQUEIDENTIFIER NULL,
-        ContractAddress NVARCHAR(42) NOT NULL,
-        ChainId INT NOT NULL,
-        EventName NVARCHAR(100) NOT NULL,
-        TransactionHash NVARCHAR(66) NOT NULL,
-        BlockNumber BIGINT NOT NULL,
-        LogIndex INT NOT NULL,
-        PayloadJson NVARCHAR(MAX) NULL,
-        CreatedAtUtc DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
-        CONSTRAINT PK_EventLogs PRIMARY KEY (EventLogId),
-        CONSTRAINT UQ_EventLogs_Block_Log UNIQUE (ChainId, BlockNumber, TransactionHash, LogIndex)
-    );
-END;
+CREATE TABLE voting.PhieuBau (
+    MaPhieu BIGINT IDENTITY(1,1) NOT NULL,
+    MaDotBauCu UNIQUEIDENTIFIER NOT NULL,
+    DiaChiCuTri NVARCHAR(42) NOT NULL,
+    MaUngCuVien INT NOT NULL,
+    MaGiaoDich NVARCHAR(66) NOT NULL,
+    SoKhoi BIGINT NOT NULL,
+    BauLucUtc DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+    CONSTRAINT PK_PhieuBau PRIMARY KEY (MaPhieu),
+    CONSTRAINT FK_PhieuBau_DotBauCu FOREIGN KEY (MaDotBauCu)
+        REFERENCES voting.DotBauCu(MaDotBauCu) ON DELETE CASCADE,
+    CONSTRAINT FK_PhieuBau_UngCuVien FOREIGN KEY (MaDotBauCu, MaUngCuVien)
+        REFERENCES voting.UngCuVien(MaDotBauCu, MaUngCuVien),
+    CONSTRAINT UQ_PhieuBau_Dot_CuTri UNIQUE (MaDotBauCu, DiaChiCuTri),
+    CONSTRAINT UQ_PhieuBau_MaGiaoDich UNIQUE (MaGiaoDich)
+);
 GO
 
-IF OBJECT_ID('voting.SyncState', 'U') IS NULL
-BEGIN
-    CREATE TABLE voting.SyncState (
-        SyncStateId INT IDENTITY(1,1) NOT NULL,
-        ChainId INT NOT NULL,
-        ContractAddress NVARCHAR(42) NOT NULL,
-        LastScannedBlock BIGINT NOT NULL,
-        LastUpdatedAtUtc DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
-        CONSTRAINT PK_SyncState PRIMARY KEY (SyncStateId),
-        CONSTRAINT UQ_SyncState_Chain_Contract UNIQUE (ChainId, ContractAddress)
-    );
-END;
+CREATE TABLE voting.NhatKySuKien (
+    MaNhatKy BIGINT IDENTITY(1,1) NOT NULL,
+    MaDotBauCu UNIQUEIDENTIFIER NULL,
+    DiaChiHopDong NVARCHAR(42) NOT NULL,
+    MaMang INT NOT NULL,
+    TenSuKien NVARCHAR(100) NOT NULL,
+    MaGiaoDich NVARCHAR(66) NOT NULL,
+    SoKhoi BIGINT NOT NULL,
+    ChiSoLog INT NOT NULL,
+    DuLieuJson NVARCHAR(MAX) NULL,
+    TaoLucUtc DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+    CONSTRAINT PK_NhatKySuKien PRIMARY KEY (MaNhatKy),
+    CONSTRAINT UQ_NhatKySuKien_Khoi_Log UNIQUE (MaMang, SoKhoi, MaGiaoDich, ChiSoLog)
+);
 GO
 
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Candidates_ElectionId' AND object_id = OBJECT_ID('voting.Candidates'))
-BEGIN
-    CREATE INDEX IX_Candidates_ElectionId ON voting.Candidates(ElectionId);
-END;
+CREATE TABLE voting.TrangThaiDongBo (
+    MaTrangThai INT IDENTITY(1,1) NOT NULL,
+    MaMang INT NOT NULL,
+    DiaChiHopDong NVARCHAR(42) NOT NULL,
+    KhoiDaQuet BIGINT NOT NULL,
+    CapNhatLucUtc DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+    CONSTRAINT PK_TrangThaiDongBo PRIMARY KEY (MaTrangThai),
+    CONSTRAINT UQ_TrangThaiDongBo_Mang_HopDong UNIQUE (MaMang, DiaChiHopDong)
+);
+GO
 
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Whitelist_ElectionId' AND object_id = OBJECT_ID('voting.Whitelist'))
-BEGIN
-    CREATE INDEX IX_Whitelist_ElectionId ON voting.Whitelist(ElectionId);
-END;
-
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Votes_ElectionId' AND object_id = OBJECT_ID('voting.Votes'))
-BEGIN
-    CREATE INDEX IX_Votes_ElectionId ON voting.Votes(ElectionId);
-END;
-
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_EventLogs_Contract_Block' AND object_id = OBJECT_ID('voting.EventLogs'))
-BEGIN
-    CREATE INDEX IX_EventLogs_Contract_Block ON voting.EventLogs(ContractAddress, BlockNumber);
-END;
+CREATE INDEX IX_UngCuVien_MaDotBauCu ON voting.UngCuVien(MaDotBauCu);
+CREATE INDEX IX_DanhSachTrang_MaDotBauCu ON voting.DanhSachTrang(MaDotBauCu);
+CREATE INDEX IX_PhieuBau_MaDotBauCu ON voting.PhieuBau(MaDotBauCu);
+CREATE INDEX IX_NhatKySuKien_HopDong_Khoi ON voting.NhatKySuKien(DiaChiHopDong, SoKhoi);
 GO

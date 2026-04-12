@@ -1,7 +1,7 @@
 # SQL Server Database Setup
 
 ## Muc tieu
-Bo script nay tao database `VotingDApp` tren SQL Server de luu lich su bau cu off-chain.
+Bo script nay tao lai database `VotingDApp` tren SQL Server de luu lich su bau cu off-chain voi ten bang/cot bang tieng Viet.
 
 ## Yeu cau
 1. SQL Server instance: `MSI\\MSSQLSERVER01`
@@ -21,18 +21,19 @@ cd database
 ```
 
 ## Cac file
-1. `01_create_database.sql`: Tao database va schema `voting`.
-2. `02_create_tables.sql`: Tao bang du lieu va indexes.
-3. `03_views.sql`: Tao view tong hop `voting.vwElectionSummary`.
+1. `01_create_database.sql`: Xoa database cu va tao moi `VotingDApp`.
+2. `02_create_tables.sql`: Tao bang du lieu voi ten bang/cot tieng Viet va indexes.
+3. `03_views.sql`: Tao view tong hop `voting.vwTongHopBauCu`.
 
 ## Cac bang chinh
-1. `voting.Elections`: Luu thong tin moi ky bau cu.
-2. `voting.Candidates`: Luu danh sach ung cu vien theo ky.
-3. `voting.Whitelist`: Luu whitelist cu tri.
-4. `voting.Votes`: Luu vote records (moi vi 1 phieu/ky).
-5. `voting.EventLogs`: Luu event on-chain da index.
-6. `voting.SyncState`: Luu block da scan de dong bo.
+1. `voting.DotBauCu`: Luu thong tin moi dot bau cu.
+2. `voting.UngCuVien`: Luu danh sach ung cu vien theo dot.
+3. `voting.DanhSachTrang`: Luu whitelist cu tri.
+4. `voting.PhieuBau`: Luu phieu bau (moi vi 1 phieu/dot).
+5. `voting.NhatKySuKien`: Luu event on-chain da index.
+6. `voting.TrangThaiDongBo`: Luu block da quet de dong bo.
 
 ## Luu y
-1. Database nay la off-chain analytics/audit.
-2. Du lieu quyet dinh ket qua bau cu van nam tren smart contract.
+1. Script se reset database, toan bo du lieu cu se bi xoa.
+2. Database nay la off-chain analytics/audit.
+3. Du lieu quyet dinh ket qua bau cu van nam tren smart contract.
