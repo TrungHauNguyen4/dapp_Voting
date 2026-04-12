@@ -73,6 +73,32 @@
         "type": "event"
       },
       {
+        "inputs": [],
+        "name": "createElection",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      {
+        "anonymous": false,
+        "inputs": [
+          {
+            "indexed": true,
+            "internalType": "uint256",
+            "name": "electionId",
+            "type": "uint256"
+          },
+          {
+            "indexed": false,
+            "internalType": "uint256",
+            "name": "createdAt",
+            "type": "uint256"
+          }
+        ],
+        "name": "ElectionCreated",
+        "type": "event"
+      },
+      {
         "anonymous": false,
         "inputs": [
           {
@@ -212,7 +238,7 @@
         "inputs": [
           {
             "internalType": "uint256",
-            "name": "",
+            "name": "candidateId",
             "type": "uint256"
           }
         ],
@@ -245,6 +271,19 @@
       {
         "inputs": [],
         "name": "candidatesCount",
+        "outputs": [
+          {
+            "internalType": "uint256",
+            "name": "",
+            "type": "uint256"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "currentElectionId",
         "outputs": [
           {
             "internalType": "uint256",
@@ -317,6 +356,81 @@
         "type": "function"
       },
       {
+        "inputs": [
+          {
+            "internalType": "uint256",
+            "name": "electionId",
+            "type": "uint256"
+          }
+        ],
+        "name": "getAllCandidatesByElection",
+        "outputs": [
+          {
+            "components": [
+              {
+                "internalType": "uint256",
+                "name": "id",
+                "type": "uint256"
+              },
+              {
+                "internalType": "string",
+                "name": "name",
+                "type": "string"
+              },
+              {
+                "internalType": "string",
+                "name": "image",
+                "type": "string"
+              },
+              {
+                "internalType": "uint256",
+                "name": "voteCount",
+                "type": "uint256"
+              }
+            ],
+            "internalType": "struct Voting.Candidate[]",
+            "name": "",
+            "type": "tuple[]"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "uint256",
+            "name": "electionId",
+            "type": "uint256"
+          }
+        ],
+        "name": "getElectionMeta",
+        "outputs": [
+          {
+            "internalType": "enum Voting.State",
+            "name": "state",
+            "type": "uint8"
+          },
+          {
+            "internalType": "uint256",
+            "name": "startTime",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "endAt",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "totalCandidates",
+            "type": "uint256"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
         "inputs": [],
         "name": "getResults",
         "outputs": [
@@ -372,8 +486,32 @@
       {
         "inputs": [
           {
+            "internalType": "uint256",
+            "name": "electionId",
+            "type": "uint256"
+          },
+          {
             "internalType": "address",
+            "name": "wallet",
+            "type": "address"
+          }
+        ],
+        "name": "hasVotedInElection",
+        "outputs": [
+          {
+            "internalType": "bool",
             "name": "",
+            "type": "bool"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "address",
+            "name": "wallet",
             "type": "address"
           }
         ],
@@ -391,8 +529,32 @@
       {
         "inputs": [
           {
+            "internalType": "uint256",
+            "name": "electionId",
+            "type": "uint256"
+          },
+          {
             "internalType": "address",
+            "name": "wallet",
+            "type": "address"
+          }
+        ],
+        "name": "isRegisteredInElection",
+        "outputs": [
+          {
+            "internalType": "bool",
             "name": "",
+            "type": "bool"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "address",
+            "name": "wallet",
             "type": "address"
           }
         ],
