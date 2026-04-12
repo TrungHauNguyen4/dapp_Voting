@@ -79,6 +79,9 @@
     "tailwindcss": "4.1.12",
     "vite": "6.3.5"
   },
+  "optionalDependencies": {
+    "msnodesqlv8": "^5.1.9"
+  },
   "peerDependencies": {
     "react": "18.3.1",
     "react-dom": "18.3.1"
