@@ -44,6 +44,7 @@ const el = {
   candidateName: document.getElementById("candidateName"),
   candidateImage: document.getElementById("candidateImage"),
   durationInput: document.getElementById("durationInput"),
+  createElectionBtn: document.getElementById("createElectionBtn"),
   startElectionBtn: document.getElementById("startElectionBtn"),
   endElectionBtn: document.getElementById("endElectionBtn"),
   whitelistMessage: document.getElementById("whitelistMessage"),
@@ -707,6 +708,33 @@ async function handleStartElection() {
   }
 }
 
+async function handleCreateElection() {
+  if (!state.contract) return;
+
+  if (state.electionState && state.electionState !== "ENDED") {
+    setMessage("Chỉ tạo kỳ bầu cử mới sau khi kỳ hiện tại đã kết thúc.", "error");
+    return;
+  }
+
+  try {
+    setLoading(true, "Đang tạo kỳ bầu cử mới...");
+
+    if (!state.contract.createElection) {
+      throw new Error("Contract không có hàm createElection.");
+    }
+
+    const tx = await state.contract.createElection();
+    await tx.wait();
+
+    await refreshAll();
+    setMessage("Đã tạo kỳ bầu cử mới. Bạn có thể nạp whitelist và thêm ứng cử viên.", "success");
+  } catch (error) {
+    setMessage(safeErrorMessage(error), "error");
+  } finally {
+    setLoading(false);
+  }
+}
+
 async function handleEndElection() {
   if (!state.contract) return;
 
@@ -737,6 +765,7 @@ function bindEvents() {
   el.syncDbBtn.addEventListener("click", syncToDatabase);
   el.whitelistForm.addEventListener("submit", handleWhitelistSubmit);
   el.candidateForm.addEventListener("submit", handleCandidateSubmit);
+  el.createElectionBtn?.addEventListener("click", handleCreateElection);
   el.startElectionBtn.addEventListener("click", handleStartElection);
   el.endElectionBtn.addEventListener("click", handleEndElection);
 
