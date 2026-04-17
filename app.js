@@ -48,7 +48,6 @@ const el = {
   durationInput: document.getElementById("durationInput"),
   createElectionBtn: document.getElementById("createElectionBtn"),
   startElectionBtn: document.getElementById("startElectionBtn"),
-  endElectionBtn: document.getElementById("endElectionBtn"),
   whitelistMessage: document.getElementById("whitelistMessage"),
   candidatesContainer: document.getElementById("candidatesContainer"),
   resultsSection: document.getElementById("resultsSection"),
@@ -664,6 +663,15 @@ async function renderResults() {
 }
 
 async function refreshAfterCountdownEnded() {
+  if (state.contract?.finalizeElectionIfEnded) {
+    try {
+      const tx = await state.contract.finalizeElectionIfEnded();
+      await tx.wait();
+    } catch {
+      // Read-only fallback is acceptable if finalization tx is not sent.
+    }
+  }
+
   await loadElectionState();
   await loadCandidates();
   updateStatus();
@@ -710,12 +718,14 @@ async function registerVoter(voterAddress) {
 }
 
 async function addCandidate(name, image) {
-  let tx;
-  try {
-    tx = await state.contract.addCandidate(name, image);
-  } catch {
-    tx = await state.contract.addCandidate(name);
-  }
+  const hasImageOverload = state.contract.interface.fragments.some(
+    (fragment) => fragment.type === "function" && fragment.name === "addCandidate" && fragment.inputs?.length === 2
+  );
+
+  const tx = hasImageOverload
+    ? await state.contract.addCandidate(name, image)
+    : await state.contract.addCandidate(name);
+
   await tx.wait();
 }
 
@@ -879,30 +889,6 @@ async function handleCreateElection() {
   }
 }
 
-async function handleEndElection() {
-  if (!state.contract) return;
-
-  try {
-    setLoading(true, "Đang kết thúc bầu cử...");
-    if (!state.contract.endElection) {
-      throw new Error("Contract không có hàm endElection.");
-    }
-
-    const tx = await state.contract.endElection();
-    await tx.wait();
-
-    await loadElectionState();
-    updateStatus();
-    renderCandidates();
-    await renderResults();
-    setMessage("Đã kết thúc bầu cử.", "success");
-  } catch (error) {
-    setMessage(safeErrorMessage(error), "error");
-  } finally {
-    setLoading(false);
-  }
-}
-
 function bindEvents() {
   el.connectWalletBtn.addEventListener("click", connectWallet);
   el.checkBackendBtn.addEventListener("click", checkBackendHealth);
@@ -913,7 +899,6 @@ function bindEvents() {
   el.candidateImageFile?.addEventListener("change", handleCandidateFilePreview);
   el.createElectionBtn?.addEventListener("click", handleCreateElection);
   el.startElectionBtn.addEventListener("click", handleStartElection);
-  el.endElectionBtn.addEventListener("click", handleEndElection);
 
   el.candidatesContainer.addEventListener("click", (event) => {
     const target = event.target;
