@@ -9,7 +9,7 @@
     "baseUrl": "http://localhost:4000"
   },
   "contract": {
-    "address": "0xBA97cf1446DC98341f6F20b21952c83e1BFEA4B1",
+    "address": "0x584Ab5dE4Eab6721eB6a095e87ACccb74999D732",
     "abi": [
       {
         "inputs": [
@@ -133,13 +133,6 @@
       {
         "inputs": [],
         "name": "endElection",
-        "outputs": [],
-        "stateMutability": "nonpayable",
-        "type": "function"
-      },
-      {
-        "inputs": [],
-        "name": "finalizeElectionIfEnded",
         "outputs": [],
         "stateMutability": "nonpayable",
         "type": "function"
