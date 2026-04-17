@@ -723,8 +723,8 @@ async function addCandidate(name, image) {
   );
 
   const tx = hasImageOverload
-    ? await state.contract.addCandidate(name, image)
-    : await state.contract.addCandidate(name);
+    ? await state.contract["addCandidate(string,string)"](name, image)
+    : await state.contract["addCandidate(string)"](name);
 
   await tx.wait();
 }
