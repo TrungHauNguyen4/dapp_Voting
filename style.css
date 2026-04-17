@@ -233,6 +233,33 @@ textarea {
   background: #f8fbff;
 }
 
+.result-item.winner {
+  border: 1px solid #f6b73c;
+  background: linear-gradient(120deg, #fffbe8 0%, #fff4cf 100%);
+}
+
+.winner-tag {
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #7a4600;
+  background: #ffe4a3;
+}
+
+.candidate-image-preview {
+  width: 100%;
+  max-width: 260px;
+  height: 140px;
+  margin-top: 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  object-fit: cover;
+  background: #eff4ff;
+}
+
 .notice {
   margin-top: 0.75rem;
   padding: 0.75rem;

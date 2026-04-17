@@ -46,7 +46,7 @@ contract Voting {
     }
 
     modifier inState(State expected) {
-        require(elections[currentElectionId].state == expected, "Trang thai bau cu khong hop le");
+        require(_effectiveState(currentElectionId) == expected, "Trang thai bau cu khong hop le");
         _;
     }
 
@@ -57,8 +57,34 @@ contract Voting {
 
     /// @notice Open a new election round after previous round has ended.
     function createElection() external onlyAdmin {
+        _finalizeIfNeeded(currentElectionId);
         require(elections[currentElectionId].state == State.Ended, "Ky bau hien tai chua ket thuc");
         _createNewElection();
+    }
+
+    /// @notice Chot ket qua neu da het gio; bat ky ai cung co the goi.
+    function finalizeElectionIfEnded() external {
+        _finalizeIfNeeded(currentElectionId);
+        require(elections[currentElectionId].state == State.Ended, "Ky bau cu chua den luc ket thuc");
+    }
+
+    function _effectiveState(uint256 electionId) private view returns (State) {
+        ElectionRound storage round = elections[electionId];
+
+        if (round.state == State.Voting && round.endTime > 0 && block.timestamp > round.endTime) {
+            return State.Ended;
+        }
+
+        return round.state;
+    }
+
+    function _finalizeIfNeeded(uint256 electionId) private {
+        ElectionRound storage round = elections[electionId];
+
+        if (round.state == State.Voting && round.endTime > 0 && block.timestamp > round.endTime) {
+            round.state = State.Ended;
+            emit ElectionEnded(round.endTime);
+        }
     }
 
     function _createNewElection() private {
@@ -162,7 +188,7 @@ contract Voting {
     // ===== Compatibility getters (current round) =====
 
     function electionState() external view returns (State) {
-        return elections[currentElectionId].state;
+        return _effectiveState(currentElectionId);
     }
 
     function endTime() external view returns (uint256) {
@@ -239,7 +265,7 @@ contract Voting {
     {
         ElectionRound storage round = elections[electionId];
         require(round.exists, "Ky bau cu khong ton tai");
-        return (round.state, round.startTime, round.endTime, round.candidatesCount);
+        return (_effectiveState(electionId), round.startTime, round.endTime, round.candidatesCount);
     }
 
     function getAllCandidatesByElection(uint256 electionId) external view returns (Candidate[] memory) {

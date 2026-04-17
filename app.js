@@ -43,6 +43,8 @@ const el = {
   candidateId: document.getElementById("candidateId"),
   candidateName: document.getElementById("candidateName"),
   candidateImage: document.getElementById("candidateImage"),
+  candidateImageFile: document.getElementById("candidateImageFile"),
+  candidateImagePreview: document.getElementById("candidateImagePreview"),
   durationInput: document.getElementById("durationInput"),
   createElectionBtn: document.getElementById("createElectionBtn"),
   startElectionBtn: document.getElementById("startElectionBtn"),
@@ -78,6 +80,119 @@ function safeErrorMessage(error) {
 function shortAddress(address) {
   if (!address) return "Chưa kết nối";
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
+}
+
+function setCandidateImagePreview(src) {
+  if (!el.candidateImagePreview) return;
+
+  if (!src) {
+    el.candidateImagePreview.classList.add("hidden");
+    el.candidateImagePreview.removeAttribute("src");
+    return;
+  }
+
+  el.candidateImagePreview.src = src;
+  el.candidateImagePreview.classList.remove("hidden");
+}
+
+function isValidImageUrl(url) {
+  return /^https?:\/\//i.test(url) || /^data:image\//i.test(url);
+}
+
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(new Error("Không đọc được file ảnh."));
+    reader.readAsDataURL(file);
+  });
+}
+
+function loadImageElement(dataUrl) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error("File ảnh không hợp lệ."));
+    img.src = dataUrl;
+  });
+}
+
+async function optimizeImageFile(file) {
+  if (!file.type.startsWith("image/")) {
+    throw new Error("Vui lòng chọn đúng định dạng file ảnh.");
+  }
+
+  const sourceDataUrl = await readFileAsDataUrl(file);
+  const img = await loadImageElement(sourceDataUrl);
+
+  const maxSide = 640;
+  const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
+  const width = Math.max(1, Math.round(img.width * scale));
+  const height = Math.max(1, Math.round(img.height * scale));
+
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    throw new Error("Trình duyệt không hỗ trợ xử lý ảnh.");
+  }
+
+  ctx.drawImage(img, 0, 0, width, height);
+
+  let quality = 0.85;
+  let optimized = canvas.toDataURL("image/jpeg", quality);
+  const maxLength = 180000;
+
+  while (optimized.length > maxLength && quality > 0.45) {
+    quality -= 0.08;
+    optimized = canvas.toDataURL("image/jpeg", quality);
+  }
+
+  return optimized;
+}
+
+async function resolveCandidateImage() {
+  const imageUrl = el.candidateImage.value.trim();
+  const imageFile = el.candidateImageFile?.files?.[0];
+
+  if (imageFile) {
+    return optimizeImageFile(imageFile);
+  }
+
+  if (imageUrl) {
+    if (!isValidImageUrl(imageUrl)) {
+      throw new Error("URL ảnh không hợp lệ. Vui lòng dùng http(s) hoặc data:image.");
+    }
+    return imageUrl;
+  }
+
+  return "";
+}
+
+async function handleCandidateFilePreview() {
+  const imageFile = el.candidateImageFile?.files?.[0];
+  if (!imageFile) {
+    const maybeUrl = el.candidateImage.value.trim();
+    setCandidateImagePreview(isValidImageUrl(maybeUrl) ? maybeUrl : "");
+    return;
+  }
+
+  try {
+    const dataUrl = await readFileAsDataUrl(imageFile);
+    setCandidateImagePreview(dataUrl);
+  } catch {
+    setCandidateImagePreview("");
+  }
+}
+
+function handleCandidateUrlPreview() {
+  if (el.candidateImageFile?.files?.length) {
+    return;
+  }
+  const maybeUrl = el.candidateImage.value.trim();
+  setCandidateImagePreview(isValidImageUrl(maybeUrl) ? maybeUrl : "");
 }
 
 function setBackendStatus(message, tone = "info") {
@@ -536,12 +651,24 @@ async function renderResults() {
     return;
   }
 
-  for (const row of results) {
+  const sorted = [...results].sort((a, b) => b.voteCount - a.voteCount);
+  const topVotes = sorted[0]?.voteCount ?? 0;
+
+  for (const row of sorted) {
     const item = document.createElement("div");
-    item.className = "result-item";
-    item.innerHTML = `<span>${row.name} (ID ${row.id})</span><strong>${row.voteCount} phiếu</strong>`;
+    const isWinner = topVotes > 0 && row.voteCount === topVotes;
+    item.className = `result-item${isWinner ? " winner" : ""}`;
+    item.innerHTML = `<span>${row.name} (ID ${row.id})${isWinner ? '<span class="winner-tag">Thắng cử</span>' : ""}</span><strong>${row.voteCount} phiếu</strong>`;
     el.resultsContainer.appendChild(item);
   }
+}
+
+async function refreshAfterCountdownEnded() {
+  await loadElectionState();
+  await loadCandidates();
+  updateStatus();
+  renderCandidates();
+  await renderResults();
 }
 
 function runCountdown() {
@@ -561,10 +688,12 @@ function runCountdown() {
     if (left <= 0) {
       el.countdown.textContent = "00:00";
       state.electionActive = false;
-      updateStatus();
-      renderCandidates();
-      renderResults();
       clearInterval(state.countdownTimer);
+      refreshAfterCountdownEnded().catch(() => {
+        updateStatus();
+        renderCandidates();
+        renderResults();
+      });
       return;
     }
 
@@ -653,20 +782,26 @@ async function handleCandidateSubmit(event) {
 
   const id = Number(el.candidateId.value);
   const name = el.candidateName.value.trim();
-  const image = el.candidateImage.value.trim();
+  let image = "";
 
-  if (!id || !name || !image) {
-    setMessage("Vui lòng điền đầy đủ ID, tên và URL hình ảnh.", "error");
+  if (!id || !name) {
+    setMessage("Vui lòng điền ID và tên ứng cử viên.", "error");
     return;
   }
 
   try {
+    image = await resolveCandidateImage();
+    if (!image) {
+      throw new Error("Vui lòng nhập URL ảnh hoặc chọn file ảnh.");
+    }
+
     setLoading(true, "Đang thêm ứng cử viên...");
     await addCandidate(name, image);
     await loadCandidates();
     renderCandidates();
     setMessage("Thêm ứng cử viên thành công.", "success");
     el.candidateForm.reset();
+    setCandidateImagePreview("");
   } catch (error) {
     setMessage(safeErrorMessage(error), "error");
   } finally {
@@ -774,6 +909,8 @@ function bindEvents() {
   el.syncDbBtn.addEventListener("click", syncToDatabase);
   el.whitelistForm.addEventListener("submit", handleWhitelistSubmit);
   el.candidateForm.addEventListener("submit", handleCandidateSubmit);
+  el.candidateImage.addEventListener("input", handleCandidateUrlPreview);
+  el.candidateImageFile?.addEventListener("change", handleCandidateFilePreview);
   el.createElectionBtn?.addEventListener("click", handleCreateElection);
   el.startElectionBtn.addEventListener("click", handleStartElection);
   el.endElectionBtn.addEventListener("click", handleEndElection);

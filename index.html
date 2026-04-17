@@ -64,8 +64,12 @@
               <input id="candidateName" type="text" placeholder="Nguyen Van A" required />
             </div>
           </div>
-          <label for="candidateImage">URL hình ảnh</label>
-          <input id="candidateImage" type="url" placeholder="https://..." required />
+          <label for="candidateImage">URL hình ảnh (tùy chọn)</label>
+          <input id="candidateImage" type="url" placeholder="https://..." />
+          <label for="candidateImageFile">Hoặc chọn file ảnh (tùy chọn)</label>
+          <input id="candidateImageFile" type="file" accept="image/*" />
+          <p class="tiny-text">Bạn có thể nhập URL hoặc chọn file. Nếu chọn file, hệ thống sẽ tối ưu dung lượng trước khi gửi lên blockchain.</p>
+          <img id="candidateImagePreview" class="candidate-image-preview hidden" alt="Xem trước ảnh ứng cử viên" />
           <button type="submit" class="btn btn-secondary">Thêm ứng cử viên</button>
         </form>
 
