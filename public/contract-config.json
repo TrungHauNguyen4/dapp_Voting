@@ -138,6 +138,13 @@
         "type": "function"
       },
       {
+        "inputs": [],
+        "name": "finalizeElectionIfEnded",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      {
         "inputs": [
           {
             "internalType": "address",
