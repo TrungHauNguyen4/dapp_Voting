@@ -9,7 +9,7 @@
     "baseUrl": "http://localhost:4000"
   },
   "contract": {
-    "address": "0x8900619688882F3958cbfDfA8ba184d93198e03f",
+    "address": "0xBA97cf1446DC98341f6F20b21952c83e1BFEA4B1",
     "abi": [
       {
         "inputs": [
