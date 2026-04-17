@@ -577,7 +577,8 @@
     "overrideKey": "votingdapp.allowAddressOverride",
     "previousAddresses": [
       "0x75F742480a242278553E41dAe94e478a35fD2C88",
-      "0x8900619688882F3958cbfDfA8ba184d93198e03f"
+      "0x8900619688882F3958cbfDfA8ba184d93198e03f",
+      "0xBA97cf1446DC98341f6F20b21952c83e1BFEA4B1"
     ]
   },
   "sync": {
