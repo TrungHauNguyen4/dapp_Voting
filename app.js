@@ -20,7 +20,8 @@ const state = {
   electionState: null,
   electionEndTs: 0,
   candidates: [],
-  countdownTimer: null
+  countdownTimer: null,
+  autoRefreshTimer: null
 };
 
 const el = {
@@ -95,8 +96,38 @@ function setCandidateImagePreview(src) {
   el.candidateImagePreview.classList.remove("hidden");
 }
 
+function normalizeImageUrl(rawUrl) {
+  const value = String(rawUrl || "").trim();
+  if (!value) return "";
+
+  if (/^data:image\//i.test(value)) return value;
+  if (/^ipfs:\/\//i.test(value)) {
+    return `https://ipfs.io/ipfs/${value.replace(/^ipfs:\/\//i, "")}`;
+  }
+  if (value.startsWith("//")) {
+    return `https:${value}`;
+  }
+
+  if (/^https?:\/\//i.test(value)) return value;
+
+  // Accept common user input like "example.com/image.jpg".
+  if (/^[^\s]+\.[^\s]+/.test(value)) {
+    return `https://${value}`;
+  }
+
+  return value;
+}
+
 function isValidImageUrl(url) {
-  return /^https?:\/\//i.test(url) || /^data:image\//i.test(url);
+  if (!url) return false;
+  if (/^data:image\//i.test(url)) return true;
+
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
 }
 
 function readFileAsDataUrl(file) {
@@ -154,7 +185,7 @@ async function optimizeImageFile(file) {
 }
 
 async function resolveCandidateImage() {
-  const imageUrl = el.candidateImage.value.trim();
+  const imageUrl = normalizeImageUrl(el.candidateImage.value);
   const imageFile = el.candidateImageFile?.files?.[0];
 
   if (imageFile) {
@@ -174,10 +205,13 @@ async function resolveCandidateImage() {
 async function handleCandidateFilePreview() {
   const imageFile = el.candidateImageFile?.files?.[0];
   if (!imageFile) {
-    const maybeUrl = el.candidateImage.value.trim();
+    const maybeUrl = normalizeImageUrl(el.candidateImage.value);
     setCandidateImagePreview(isValidImageUrl(maybeUrl) ? maybeUrl : "");
     return;
   }
+
+  // If user picked a file, treat file as source of truth and clear URL text.
+  el.candidateImage.value = "";
 
   try {
     const dataUrl = await readFileAsDataUrl(imageFile);
@@ -188,11 +222,36 @@ async function handleCandidateFilePreview() {
 }
 
 function handleCandidateUrlPreview() {
-  if (el.candidateImageFile?.files?.length) {
-    return;
+  // If user is typing URL, URL should take precedence over previous file selection.
+  if (el.candidateImageFile?.files?.length && el.candidateImage.value.trim()) {
+    el.candidateImageFile.value = "";
   }
-  const maybeUrl = el.candidateImage.value.trim();
+
+  const maybeUrl = normalizeImageUrl(el.candidateImage.value);
+  if (maybeUrl && maybeUrl !== el.candidateImage.value.trim()) {
+    el.candidateImage.value = maybeUrl;
+  }
+
   setCandidateImagePreview(isValidImageUrl(maybeUrl) ? maybeUrl : "");
+}
+
+async function safeRefreshAll() {
+  if (!state.contract || !state.account) return;
+  try {
+    await refreshAll();
+  } catch {
+    // Ignore intermittent RPC errors for background refresh.
+  }
+}
+
+function startAutoRefresh() {
+  if (state.autoRefreshTimer) {
+    clearInterval(state.autoRefreshTimer);
+  }
+
+  state.autoRefreshTimer = setInterval(() => {
+    safeRefreshAll();
+  }, 12000);
 }
 
 function setBackendStatus(message, tone = "info") {
@@ -447,11 +506,16 @@ async function connectWallet() {
     state.contract = new ethers.Contract(ACTIVE_CONTRACT_ADDRESS, ACTIVE_CONTRACT_ABI, state.signer);
 
     window.ethereum.removeAllListeners?.("accountsChanged");
+    window.ethereum.removeAllListeners?.("chainChanged");
     window.ethereum.on("accountsChanged", () => {
+      window.location.reload();
+    });
+    window.ethereum.on("chainChanged", () => {
       window.location.reload();
     });
 
     await refreshAll();
+    startAutoRefresh();
     setMessage("Kết nối ví thành công.", "success");
   } catch (error) {
     setMessage(safeErrorMessage(error), "error");
@@ -872,6 +936,11 @@ async function handleCreateElection() {
     const tx = await state.contract.createElection();
     await tx.wait();
 
+    // Clear any stale client state first, then fetch current round state.
+    state.hasVoted = false;
+    state.candidates = [];
+    renderCandidates();
+
     await refreshAll();
     setMessage("Đã tạo kỳ bầu cử mới. Bạn có thể nạp whitelist và thêm ứng cử viên.", "success");
   } catch (error) {
@@ -912,6 +981,7 @@ function bindEvents() {
   el.whitelistForm.addEventListener("submit", handleWhitelistSubmit);
   el.candidateForm.addEventListener("submit", handleCandidateSubmit);
   el.candidateImage.addEventListener("input", handleCandidateUrlPreview);
+  el.candidateImage.addEventListener("change", handleCandidateUrlPreview);
   el.candidateImageFile?.addEventListener("change", handleCandidateFilePreview);
   el.createElectionBtn?.addEventListener("click", handleCreateElection);
   el.startElectionBtn.addEventListener("click", handleStartElection);
@@ -927,6 +997,12 @@ function bindEvents() {
     const id = Number(voteBtn.dataset.candidateId);
     if (!id) return;
     handleVote(id);
+  });
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") {
+      safeRefreshAll();
+    }
   });
 }
 
