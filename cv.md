@@ -72,17 +72,25 @@
 - **Database Name:** VotingDApp
 - **Authentication:** SQL Authentication với driver mssql
 - **Bảng dữ liệu (Tên tiếng Việt):**
-  - `voting.DotBauCu` - Thông tin kỳ bầu cử
+  - `voting.DotBauCu` - Thông tin kỳ bầu cử (với ElectionIdOnChain và MaDotBauCuCu)
   - `voting.UngCuVien` - Danh sách ứng cử viên
   - `voting.DanhSachTrang` - Whitelist cử tri
   - `voting.PhieuBau` - Phiếu bầu
-  - `voting.NhatKySuKien` - Event logs on-chain
   - `voting.TrangThaiDongBo` - Trạng thái đồng bộ blockchain
+  - `voting.SnapshotKetQua` - Snapshot kết quả bầu cử (chứng minh minh bạch)
+  - `voting.AuditLog` - Log các thay đổi quan trọng
+  - `voting.ThongKeTongHop` - Thống kê tổng hợp
 - **Views:**
-  - `voting.vwTongHopBauCu` - View tổng hợp dữ liệu bầu cử
+  - `voting.vwTongHopBauCu` - View tổng hợp dữ liệu bầu cử với snapshot
+  - `voting.vwLichSuBauCu` - View lịch sử bầu cử với kết quả từ snapshot
+  - `voting.vwKetQuaBauCu` - View kết quả bầu cử chi tiết
+  - `voting.vwCuTriDaBau` - View danh sách cử tri đã bỏ phiếu
+  - `voting.vwAuditLog` - View audit log
+  - `voting.vwThongKeTongHop` - View thống kê tổng hợp
 - **Setup Scripts:**
   - PowerShell setup script cho Windows/SQL Authentication
   - SQL scripts: create database, tables, views
+  - Migration scripts: election ID columns, database optimization, structure improvement
 
 ### DevOps & Deployment
 - **Package Manager:** npm với package-lock.json
@@ -92,6 +100,7 @@
   - `npm run dev:full` - Chạy full stack (frontend + backend) với concurrently
   - `npm run sync` - Đồng bộ dữ liệu blockchain → SQL một lần
   - `npm run build` - Build production
+- **Frontend Deployment:** Vercel (GitHub integration)
 - **Cấu hình:**
   - `contract-config.json` - Cấu hình network, contract address, ABI, backend URL
   - `.env` - SQL Server credentials, CORS origins, host/port
@@ -140,25 +149,38 @@
   - Query logs theo batch với adaptive step size
   - Auto-retry khi RPC timeout
   - Lưu sync state để tránh quét lại
+  - Lấy currentElectionId từ blockchain
 - ✅ Database operations:
-  - Upsert election metadata
+  - Upsert election metadata với Election ID calculation
   - Replace candidates
   - Upsert votes và whitelist
-  - Insert event logs
+  - Tạo snapshot kết quả khi bầu cử kết thúc
+  - Thêm audit log cho các thay đổi quan trọng
+  - Cập nhật thống kê tổng hợp sau mỗi sync
+- ✅ Election ID mechanism:
+  - Tính MaDotBauCuCu = ElectionIdOnChain + MAX(MaDotBauCuCu)
+  - Giải quyết vấn đề contract reset electionId khi deploy lại
 - ✅ Error handling với meaningful messages
 
 ### 4. Database (SQL Server)
 - ✅ Database schema với tên bảng/cột tiếng Việt
-- ✅ Tables với proper indexes
+- ✅ Tables với proper indexes cho tối ưu hiệu suất
 - ✅ Views cho aggregated queries
+- ✅ Snapshot mechanism để chứng minh minh bạch
+- ✅ Audit log để track lịch sử thay đổi
+- ✅ Thống kê tổng hợp để tránh query phức tạp
+- ✅ Election ID calculation mechanism
 - ✅ PowerShell setup script
 - ✅ Support cả Windows và SQL Authentication
+- ✅ Migration scripts cho database evolution
 
 ### 5. Documentation & Configuration
 - ✅ README.md với hướng dẫn chạy dự án
 - ✅ SRS-VotingDApp.md - Đặc tả phần mềm chi tiết
 - ✅ CONTRACT_REVIEW.md - Contract review document
 - ✅ Database README với hướng dẫn setup
+- ✅ coche.md - Document cơ chế tái sử dụng contract và cải tiến
+- ✅ cv.md - CV dự án đầy đủ
 - ✅ .env.example cho cấu hình môi trường
 - ✅ contract-config.json cho network/contract configuration
 
@@ -201,6 +223,11 @@
 5. **Contract Address Locking:** Cơ chế khóa contract address để tránh nhầm lẫn môi trường deploy
 6. **Vietnamese Database Schema:** Sử dụng tên bảng/cột tiếng Việt cho dễ hiểu và phù hợp context
 7. **Full-stack Integration:** Tích hợp seamless giữa smart contract, frontend, backend, và database
+8. **Election ID Calculation:** Cơ chế tính MaDotBauCuCu = ElectionIdOnChain + MAX(MaDotBauCuCu) để giải quyết contract reset
+9. **Snapshot Mechanism:** Tự động tạo snapshot kết quả khi bầu cử kết thúc để chứng minh minh bạch
+10. **Audit Trail:** Tự động log các thay đổi quan trọng để track lịch sử
+11. **Performance Optimization:** Thêm indexes và thống kê tổng hợp để tăng tốc độ query
+12. **Database Evolution:** Migration scripts để nâng cấp database mà không mất dữ liệu
 
 ---
 
