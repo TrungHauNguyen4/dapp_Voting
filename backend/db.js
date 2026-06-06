@@ -32,6 +32,14 @@ export async function closeDbPool() {
   }
 }
 
+export async function getMaxMaDotBauCuCu(pool) {
+  const result = await pool.request().query(`
+SELECT ISNULL(MAX(MaDotBauCuCu), 0) AS MaxId
+FROM voting.DotBauCu
+`);
+  return Number(result.recordset[0].MaxId);
+}
+
 export async function upsertElection(pool, election) {
   const request = pool.request();
   request.input("ContractAddress", sql.NVarChar(42), election.contractAddress.toLowerCase());
@@ -40,6 +48,13 @@ export async function upsertElection(pool, election) {
   request.input("State", sql.NVarChar(20), election.state);
   request.input("StartTimeUtc", sql.DateTime2, election.startTimeUtc);
   request.input("EndTimeUtc", sql.DateTime2, election.endTimeUtc);
+  request.input("ElectionIdOnChain", sql.Int, election.electionIdOnChain ?? 1);
+
+  // Tính MaDotBauCuCu = ElectionIdOnChain + Max(MaDotBauCuCu hiện có)
+  // Cơ chế này đảm bảo ID tăng dần ngay cả khi contract được deploy lại
+  const maxStoredId = await getMaxMaDotBauCuCu(pool);
+  const calculatedId = (election.electionIdOnChain ?? 1) + maxStoredId;
+  request.input("MaDotBauCuCu", sql.Int, calculatedId);
 
   const query = `
 MERGE voting.DotBauCu AS target
@@ -50,10 +65,12 @@ WHEN MATCHED THEN
     DiaChiQuanTri = @AdminAddress,
     TrangThai = @State,
     BatDauLucUtc = @StartTimeUtc,
-    KetThucLucUtc = @EndTimeUtc
+    KetThucLucUtc = @EndTimeUtc,
+    ElectionIdOnChain = @ElectionIdOnChain,
+    MaDotBauCuCu = @MaDotBauCuCu
 WHEN NOT MATCHED THEN
-  INSERT (DiaChiHopDong, MaMang, DiaChiQuanTri, TrangThai, BatDauLucUtc, KetThucLucUtc)
-  VALUES (@ContractAddress, @ChainId, @AdminAddress, @State, @StartTimeUtc, @EndTimeUtc)
+  INSERT (DiaChiHopDong, MaMang, DiaChiQuanTri, TrangThai, BatDauLucUtc, KetThucLucUtc, ElectionIdOnChain, MaDotBauCuCu)
+  VALUES (@ContractAddress, @ChainId, @AdminAddress, @State, @StartTimeUtc, @EndTimeUtc, @ElectionIdOnChain, @MaDotBauCuCu)
 OUTPUT inserted.MaDotBauCu;
 `;
 
@@ -62,10 +79,6 @@ OUTPUT inserted.MaDotBauCu;
 }
 
 export async function replaceCandidates(pool, electionId, candidates) {
-  await pool.request()
-    .input("ElectionId", sql.UniqueIdentifier, electionId)
-    .query("DELETE FROM voting.UngCuVien WHERE MaDotBauCu = @ElectionId");
-
   for (const c of candidates) {
     await pool.request()
       .input("ElectionId", sql.UniqueIdentifier, electionId)
@@ -74,8 +87,24 @@ export async function replaceCandidates(pool, electionId, candidates) {
       .input("ImageUrl", sql.NVarChar(1000), c.image || "")
       .input("VoteCount", sql.BigInt, c.voteCount)
       .query(`
-INSERT INTO voting.UngCuVien (MaDotBauCu, MaUngCuVien, TenUngCuVien, AnhUrl, SoPhieu)
-VALUES (@ElectionId, @CandidateId, @CandidateName, @ImageUrl, @VoteCount)
+MERGE voting.UngCuVien AS target
+USING (
+  SELECT
+    @ElectionId AS MaDotBauCu,
+    @CandidateId AS MaUngCuVien,
+    @CandidateName AS TenUngCuVien,
+    @ImageUrl AS AnhUrl,
+    @VoteCount AS SoPhieu
+) AS source
+ON target.MaDotBauCu = source.MaDotBauCu AND target.MaUngCuVien = source.MaUngCuVien
+WHEN MATCHED THEN
+  UPDATE SET
+    TenUngCuVien = source.TenUngCuVien,
+    AnhUrl = source.AnhUrl,
+    SoPhieu = source.SoPhieu
+WHEN NOT MATCHED THEN
+  INSERT (MaDotBauCu, MaUngCuVien, TenUngCuVien, AnhUrl, SoPhieu)
+  VALUES (source.MaDotBauCu, source.MaUngCuVien, source.TenUngCuVien, source.AnhUrl, source.SoPhieu);
 `);
   }
 }

@@ -90,6 +90,7 @@ export async function syncOnce() {
   const toBlock = Math.max(0, latestBlock - serverCfg.confirmations);
 
   const adminAddress = await contract.admin();
+  const currentElectionIdOnChain = Number(await contract.currentElectionId());
   const rawState = Number(await contract.electionState());
   const electionState = mapElectionState(rawState);
   const endTime = Number(await contract.endTime());
@@ -103,7 +104,8 @@ export async function syncOnce() {
     adminAddress,
     state: electionState,
     startTimeUtc,
-    endTimeUtc
+    endTimeUtc,
+    electionIdOnChain: currentElectionIdOnChain
   });
 
   const candidates = await fetchCandidates(contract);

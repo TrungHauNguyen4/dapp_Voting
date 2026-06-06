@@ -11,6 +11,8 @@ GO
 
 CREATE TABLE voting.DotBauCu (
     MaDotBauCu UNIQUEIDENTIFIER NOT NULL DEFAULT NEWID(),
+    MaDotBauCuCu INT NOT NULL,
+    ElectionIdOnChain INT NOT NULL,
     DiaChiHopDong NVARCHAR(42) NOT NULL,
     MaMang INT NOT NULL,
     DiaChiQuanTri NVARCHAR(42) NOT NULL,
@@ -23,7 +25,8 @@ CREATE TABLE voting.DotBauCu (
     BlockDongBoGanNhat BIGINT NULL,
     CONSTRAINT PK_DotBauCu PRIMARY KEY (MaDotBauCu),
     CONSTRAINT CK_DotBauCu_TrangThai CHECK (TrangThai IN ('Created', 'Voting', 'Ended')),
-    CONSTRAINT UQ_DotBauCu_HopDong_Mang UNIQUE (DiaChiHopDong, MaMang)
+    CONSTRAINT UQ_DotBauCu_HopDong_Mang UNIQUE (DiaChiHopDong, MaMang),
+    CONSTRAINT UQ_DotBauCu_Cu UNIQUE (MaDotBauCuCu)
 );
 GO
 
