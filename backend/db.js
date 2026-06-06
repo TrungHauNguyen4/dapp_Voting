@@ -141,29 +141,6 @@ WHERE MaMang = @ChainId AND DiaChiHopDong = @ContractAddress
   return Number(result.recordset[0].KhoiDaQuet);
 }
 
-export async function insertEventLog(pool, logRow) {
-  await pool.request()
-    .input("ElectionId", sql.UniqueIdentifier, logRow.electionId)
-    .input("ContractAddress", sql.NVarChar(42), logRow.contractAddress.toLowerCase())
-    .input("ChainId", sql.Int, logRow.chainId)
-    .input("EventName", sql.NVarChar(100), logRow.eventName)
-    .input("TransactionHash", sql.NVarChar(66), logRow.transactionHash)
-    .input("BlockNumber", sql.BigInt, logRow.blockNumber)
-    .input("LogIndex", sql.Int, logRow.logIndex)
-    .input("PayloadJson", sql.NVarChar(sql.MAX), JSON.stringify(logRow.payload || {}))
-    .query(`
-BEGIN TRY
-    INSERT INTO voting.NhatKySuKien
-    (MaDotBauCu, DiaChiHopDong, MaMang, TenSuKien, MaGiaoDich, SoKhoi, ChiSoLog, DuLieuJson)
-    VALUES
-    (@ElectionId, @ContractAddress, @ChainId, @EventName, @TransactionHash, @BlockNumber, @LogIndex, @PayloadJson)
-END TRY
-BEGIN CATCH
-    IF ERROR_NUMBER() NOT IN (2601, 2627) THROW;
-END CATCH
-`);
-}
-
 export async function upsertVote(pool, voteRow) {
   await pool.request()
     .input("ElectionId", sql.UniqueIdentifier, voteRow.electionId)
@@ -201,4 +178,77 @@ END CATCH
 export async function getElectionSummaries(pool) {
   const result = await pool.request().query("SELECT * FROM voting.vwTongHopBauCu ORDER BY CreatedAtUtc DESC");
   return result.recordset;
+}
+
+export async function createSnapshot(pool, electionId, electionData) {
+  const request = pool.request();
+  request.input("ElectionId", sql.UniqueIdentifier, electionId);
+  request.input("TongSoUngCuVien", sql.Int, electionData.totalCandidates);
+  request.input("TongSoPhieu", sql.Int, electionData.totalVotes);
+  request.input("TongSoCuTri", sql.Int, electionData.totalVoters);
+  request.input("UngCuVienChienThang", sql.NVarChar(200), electionData.winner || null);
+  request.input("PhieuChienThang", sql.Int, electionData.winnerVotes || null);
+  request.input("TyLeChienThang", sql.Decimal(5, 2), electionData.winnerPercentage || null);
+  request.input("TrangThaiCu", sql.NVarChar(20), electionData.state);
+  request.input("BlockSnapshot", sql.BigInt, electionData.blockNumber);
+  request.input("HashSnapshot", sql.NVarChar(66), electionData.snapshotHash || null);
+
+  await request.query(`
+MERGE voting.SnapshotKetQua AS target
+USING (SELECT @ElectionId AS MaDotBauCu) AS source
+ON target.MaDotBauCu = source.MaDotBauCu
+WHEN MATCHED THEN
+  UPDATE SET
+    TongSoUngCuVien = @TongSoUngCuVien,
+    TongSoPhieu = @TongSoPhieu,
+    TongSoCuTri = @TongSoCuTri,
+    UngCuVienChienThang = @UngCuVienChienThang,
+    PhieuChienThang = @PhieuChienThang,
+    TyLeChienThang = @TyLeChienThang,
+    TrangThaiCu = @TrangThaiCu,
+    BlockSnapshot = @BlockSnapshot,
+    HashSnapshot = @HashSnapshot
+WHEN NOT MATCHED THEN
+  INSERT (MaDotBauCu, MaDotBauCuCu, TongSoUngCuVien, TongSoPhieu, TongSoCuTri, UngCuVienChienThang, PhieuChienThang, TyLeChienThang, TrangThaiCu, BlockSnapshot, HashSnapshot)
+  SELECT 
+    @ElectionId,
+    (SELECT MaDotBauCuCu FROM voting.DotBauCu WHERE MaDotBauCu = @ElectionId),
+    @TongSoUngCuVien,
+    @TongSoPhieu,
+    @TongSoCuTri,
+    @UngCuVienChienThang,
+    @PhieuChienThang,
+    @TyLeChienThang,
+    @TrangThaiCu,
+    @BlockSnapshot,
+    @HashSnapshot;
+`);
+}
+
+export async function updateThongKeTongHop(pool) {
+  await pool.request().query(`
+UPDATE voting.ThongKeTongHop
+SET 
+  TongSoDotBauCu = (SELECT COUNT(*) FROM voting.DotBauCu),
+  TongSoCuTri = (SELECT COUNT(DISTINCT DiaChiVi) FROM voting.DanhSachTrang),
+  TongSoPhieu = (SELECT COUNT(*) FROM voting.PhieuBau),
+  CapNhatLucUtc = SYSUTCDATETIME();
+`);
+}
+
+export async function addAuditLog(pool, auditData) {
+  const request = pool.request();
+  request.input("MaDotBauCu", sql.UniqueIdentifier, auditData.electionId || null);
+  request.input("MaDotBauCuCu", sql.Int, auditData.electionNumber || null);
+  request.input("LoaiHanhDong", sql.NVarChar(50), auditData.actionType);
+  request.input("ThucThe", sql.NVarChar(50), auditData.entityType);
+  request.input("NoiDung", sql.NVarChar(1000), auditData.description || null);
+  request.input("ThucHienBoi", sql.NVarChar(42), auditData.performedBy || null);
+  request.input("DuLieuCu", sql.NVarChar(sql.MAX), auditData.oldData ? JSON.stringify(auditData.oldData) : null);
+  request.input("DuLieuMoi", sql.NVarChar(sql.MAX), auditData.newData ? JSON.stringify(auditData.newData) : null);
+
+  await request.query(`
+INSERT INTO voting.AuditLog (MaDotBauCu, MaDotBauCuCu, LoaiHanhDong, ThucThe, NoiDung, ThucHienBoi, DuLieuCu, DuLieuMoi)
+VALUES (@MaDotBauCu, @MaDotBauCuCu, @LoaiHanhDong, @ThucThe, @NoiDung, @ThucHienBoi, @DuLieuCu, @DuLieuMoi);
+`);
 }

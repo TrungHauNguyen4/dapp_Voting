@@ -2,12 +2,14 @@ import { ethers } from "ethers";
 import {
   getDbPool,
   getSyncState,
-  insertEventLog,
   replaceCandidates,
   upsertElection,
   upsertSyncState,
   upsertVote,
-  upsertWhitelist
+  upsertWhitelist,
+  createSnapshot,
+  updateThongKeTongHop,
+  addAuditLog
 } from "./db.js";
 import { readContractConfig, readServerConfig } from "./config.js";
 
@@ -129,19 +131,6 @@ export async function syncOnce() {
         walletAddress,
         registeredBy: adminAddress
       });
-
-      await insertEventLog(pool, {
-        electionId,
-        contractAddress: appCfg.contract.address,
-        chainId,
-        eventName: "VoterRegistered",
-        transactionHash: ev.transactionHash,
-        blockNumber: Number(ev.blockNumber),
-        logIndex: Number(ev.index ?? 0),
-        payload: {
-          voter: walletAddress
-        }
-      });
     }
 
     for (const ev of voteEvents) {
@@ -155,24 +144,44 @@ export async function syncOnce() {
         transactionHash: ev.transactionHash,
         blockNumber: Number(ev.blockNumber)
       });
-
-      await insertEventLog(pool, {
-        electionId,
-        contractAddress: appCfg.contract.address,
-        chainId,
-        eventName: "VoteCast",
-        transactionHash: ev.transactionHash,
-        blockNumber: Number(ev.blockNumber),
-        logIndex: Number(ev.index ?? 0),
-        payload: {
-          voter: voterAddress,
-          candidateId
-        }
-      });
     }
   }
 
   await upsertSyncState(pool, chainId, appCfg.contract.address, toBlock);
+
+  // Tạo snapshot khi bầu cử kết thúc
+  if (electionState === 'Ended') {
+    const winner = candidates.reduce((prev, current) => (prev.voteCount > current.voteCount) ? prev : current);
+    const totalVotes = candidates.reduce((sum, c) => sum + c.voteCount, 0);
+    const winnerPercentage = totalVotes > 0 ? (winner.voteCount / totalVotes * 100).toFixed(2) : 0;
+
+    await createSnapshot(pool, electionId, {
+      totalCandidates: candidates.length,
+      totalVotes,
+      totalVoters: registeredEvents.length,
+      winner: winner.name,
+      winnerVotes: winner.voteCount,
+      winnerPercentage: parseFloat(winnerPercentage),
+      state: electionState,
+      blockNumber: toBlock,
+      snapshotHash: null
+    });
+
+    // Thêm audit log cho việc kết thúc bầu cử
+    await addAuditLog(pool, {
+      electionId,
+      electionNumber: null,
+      actionType: 'END_ELECTION',
+      entityType: 'Election',
+      description: `Bầu cử kết thúc. Người chiến thắng: ${winner.name} với ${winner.voteCount} phiếu (${winnerPercentage}%)`,
+      performedBy: adminAddress,
+      oldData: { state: 'Voting' },
+      newData: { state: 'Ended', winner: winner.name }
+    });
+  }
+
+  // Cập nhật thống kê tổng hợp
+  await updateThongKeTongHop(pool);
 
   return {
     electionId,

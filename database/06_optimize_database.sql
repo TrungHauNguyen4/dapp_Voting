@@ -1,44 +1,30 @@
+-- Migration script: Tối ưu database
+-- Xóa bảng không cần thiết và thêm views trực quan hơn
+
 USE VotingDApp;
 GO
 
--- Xóa các view cũ nếu tồn tại
+-- 1. Xóa bảng NhatKySuKien (chỉ dùng cho debug, không cần thiết cho báo cáo)
+IF OBJECT_ID('voting.NhatKySuKien', 'U') IS NOT NULL
+BEGIN
+    DROP TABLE voting.NhatKySuKien;
+    PRINT 'Đã xóa bảng voting.NhatKySuKien';
+END
+ELSE
+BEGIN
+    PRINT 'Bảng voting.NhatKySuKien không tồn tại';
+END
+GO
+
+-- 2. Xóa view cũ
 IF OBJECT_ID('voting.vwTongHopBauCu', 'V') IS NOT NULL
 BEGIN
     DROP VIEW voting.vwTongHopBauCu;
-END;
+    PRINT 'Đã xóa view vwTongHopBauCu cũ';
+END
 GO
 
-IF OBJECT_ID('voting.vwLichSuBauCu', 'V') IS NOT NULL
-BEGIN
-    DROP VIEW voting.vwLichSuBauCu;
-END;
-GO
-
-IF OBJECT_ID('voting.vwKetQuaBauCu', 'V') IS NOT NULL
-BEGIN
-    DROP VIEW voting.vwKetQuaBauCu;
-END;
-GO
-
-IF OBJECT_ID('voting.vwCuTriDaBau', 'V') IS NOT NULL
-BEGIN
-    DROP VIEW voting.vwCuTriDaBau;
-END;
-GO
-
-IF OBJECT_ID('voting.vwAuditLog', 'V') IS NOT NULL
-BEGIN
-    DROP VIEW voting.vwAuditLog;
-END;
-GO
-
-IF OBJECT_ID('voting.vwThongKeTongHop', 'V') IS NOT NULL
-BEGIN
-    DROP VIEW voting.vwThongKeTongHop;
-END;
-GO
-
--- View tổng hợp cuộc bầu cử
+-- 3. Tạo view tổng hợp cuộc bầu cử (cập nhật)
 CREATE VIEW voting.vwTongHopBauCu
 AS
 SELECT
@@ -55,16 +41,11 @@ SELECT
     COUNT(DISTINCT u.MaDongUngCuVien) AS CandidateCount,
     COUNT(DISTINCT p.MaPhieu) AS VoteCount,
     COUNT(DISTINCT t.MaTrang) AS WhitelistCount,
-    d.BlockDongBoGanNhat AS LastSyncedBlock,
-    s.ThoiGianSnapshot AS SnapshotTime,
-    s.UngCuVienChienThang AS Winner,
-    s.PhieuChienThang AS WinnerVotes,
-    s.TyLeChienThang AS WinnerPercentage
+    d.BlockDongBoGanNhat AS LastSyncedBlock
 FROM voting.DotBauCu d
 LEFT JOIN voting.UngCuVien u ON u.MaDotBauCu = d.MaDotBauCu
 LEFT JOIN voting.PhieuBau p ON p.MaDotBauCu = d.MaDotBauCu
 LEFT JOIN voting.DanhSachTrang t ON t.MaDotBauCu = d.MaDotBauCu
-LEFT JOIN voting.SnapshotKetQua s ON s.MaDotBauCu = d.MaDotBauCu
 GROUP BY
     d.MaDotBauCu,
     d.MaDotBauCuCu,
@@ -76,14 +57,20 @@ GROUP BY
     d.BatDauLucUtc,
     d.KetThucLucUtc,
     d.TaoLucUtc,
-    d.BlockDongBoGanNhat,
-    s.ThoiGianSnapshot,
-    s.UngCuVienChienThang,
-    s.PhieuChienThang,
-    s.TyLeChienThang;
+    d.BlockDongBoGanNhat;
 GO
 
--- View lịch sử các cuộc bầu cử
+PRINT 'Đã tạo view vwTongHopBauCu mới';
+GO
+
+-- 4. Tạo view lịch sử các cuộc bầu cử (theo thời gian)
+IF OBJECT_ID('voting.vwLichSuBauCu', 'V') IS NOT NULL
+BEGIN
+    DROP VIEW voting.vwLichSuBauCu;
+    PRINT 'Đã xóa view vwLichSuBauCu cũ';
+END
+GO
+
 CREATE VIEW voting.vwLichSuBauCu
 AS
 SELECT
@@ -94,20 +81,23 @@ SELECT
     d.BatDauLucUtc AS StartTimeUtc,
     d.KetThucLucUtc AS EndTimeUtc,
     d.TaoLucUtc AS CreatedAtUtc,
-    CASE
+    CASE 
         WHEN d.TrangThai = 'Ended' THEN 'Đã kết thúc'
         WHEN d.TrangThai = 'Voting' THEN 'Đang bầu cử'
         WHEN d.TrangThai = 'Created' THEN 'Đã tạo'
         ELSE 'Không xác định'
     END AS StateText,
-    s.UngCuVienChienThang AS Winner,
-    s.PhieuChienThang AS WinnerVotes,
-    s.TyLeChienThang AS WinnerPercentage,
-    s.TongSoPhieu AS TotalVotes,
-    s.TongSoCuTri AS TotalVoters,
-    s.ThoiGianSnapshot AS SnapshotTime
+    CASE 
+        WHEN d.TrangThai = 'Ended' THEN 
+            (SELECT TOP 1 u.TenUngCuVien 
+             FROM voting.UngCuVien u 
+             WHERE u.MaDotBauCu = d.MaDotBauCu 
+             ORDER BY u.SoPhieu DESC)
+        ELSE NULL
+    END AS Winner,
+    COUNT(DISTINCT p.MaPhieu) AS TotalVotes,
+    COUNT(DISTINCT t.MaTrang) AS TotalVoters
 FROM voting.DotBauCu d
-LEFT JOIN voting.SnapshotKetQua s ON s.MaDotBauCu = d.MaDotBauCu
 LEFT JOIN voting.PhieuBau p ON p.MaDotBauCu = d.MaDotBauCu
 LEFT JOIN voting.DanhSachTrang t ON t.MaDotBauCu = d.MaDotBauCu
 GROUP BY
@@ -117,16 +107,20 @@ GROUP BY
     d.TrangThai,
     d.BatDauLucUtc,
     d.KetThucLucUtc,
-    d.TaoLucUtc,
-    s.UngCuVienChienThang,
-    s.PhieuChienThang,
-    s.TyLeChienThang,
-    s.TongSoPhieu,
-    s.TongSoCuTri,
-    s.ThoiGianSnapshot;
+    d.TaoLucUtc;
 GO
 
--- View kết quả bầu cử chi tiết
+PRINT 'Đã tạo view vwLichSuBauCu';
+GO
+
+-- 5. Tạo view kết quả bầu cử chi tiết
+IF OBJECT_ID('voting.vwKetQuaBauCu', 'V') IS NOT NULL
+BEGIN
+    DROP VIEW voting.vwKetQuaBauCu;
+    PRINT 'Đã xóa view vwKetQuaBauCu cũ';
+END
+GO
+
 CREATE VIEW voting.vwKetQuaBauCu
 AS
 SELECT
@@ -138,18 +132,28 @@ SELECT
     u.AnhUrl AS ImageUrl,
     u.SoPhieu AS VoteCount,
     CAST(u.SoPhieu * 100.0 / NULLIF(SUM(u.SoPhieu) OVER (PARTITION BY d.MaDotBauCu), 0) AS DECIMAL(5,2)) AS VotePercentage,
-    CASE
-        WHEN u.SoPhieu = (SELECT MAX(SoPhieu) FROM voting.UngCuVien WHERE MaDotBauCu = d.MaDotBauCu)
-             AND u.SoPhieu > 0
-        THEN 1
-        ELSE 0
+    CASE 
+        WHEN u.SoPhieu = (SELECT MAX(SoPhieu) FROM voting.UngCuVien WHERE MaDotBauCu = d.MaDotBauCu) 
+             AND u.SoPhieu > 0 
+        THEN 1 
+        ELSE 0 
     END AS IsWinner
 FROM voting.DotBauCu d
 INNER JOIN voting.UngCuVien u ON u.MaDotBauCu = d.MaDotBauCu
 WHERE d.TrangThai = 'Ended';
 GO
 
--- View danh sách cử tri đã bỏ phiếu
+PRINT 'Đã tạo view vwKetQuaBauCu';
+GO
+
+-- 6. Tạo view danh sách cử tri đã bỏ phiếu
+IF OBJECT_ID('voting.vwCuTriDaBau', 'V') IS NOT NULL
+BEGIN
+    DROP VIEW voting.vwCuTriDaBau;
+    PRINT 'Đã xóa view vwCuTriDaBau cũ';
+END
+GO
+
 CREATE VIEW voting.vwCuTriDaBau
 AS
 SELECT
@@ -166,29 +170,7 @@ INNER JOIN voting.PhieuBau p ON p.MaDotBauCu = d.MaDotBauCu
 INNER JOIN voting.UngCuVien u ON u.MaDotBauCu = p.MaDotBauCu AND u.MaUngCuVien = p.MaUngCuVien;
 GO
 
--- View audit log
-CREATE VIEW voting.vwAuditLog
-AS
-SELECT
-    a.MaAuditLog,
-    a.MaDotBauCuCu AS ElectionNumber,
-    a.LoaiHanhDong AS ActionType,
-    a.ThucThe AS EntityType,
-    a.NoiDung AS Description,
-    a.ThucHienBoi AS PerformedBy,
-    a.ThoiGian AS Timestamp,
-    a.DuLieuCu AS OldData,
-    a.DuLieuMoi AS NewData
-FROM voting.AuditLog a;
+PRINT 'Đã tạo view vwCuTriDaBau';
 GO
 
--- View thống kê tổng hợp
-CREATE VIEW voting.vwThongKeTongHop
-AS
-SELECT
-    TongSoDotBauCu AS TotalElections,
-    TongSoCuTri AS TotalVoters,
-    TongSoPhieu AS TotalVotes,
-    CapNhatLucUtc AS LastUpdated
-FROM voting.ThongKeTongHop;
-GO
+PRINT 'Hoàn tất tối ưu database!';

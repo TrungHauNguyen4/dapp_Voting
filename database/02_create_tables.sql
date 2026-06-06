@@ -4,7 +4,6 @@ GO
 DROP TABLE IF EXISTS voting.PhieuBau;
 DROP TABLE IF EXISTS voting.DanhSachTrang;
 DROP TABLE IF EXISTS voting.UngCuVien;
-DROP TABLE IF EXISTS voting.NhatKySuKien;
 DROP TABLE IF EXISTS voting.TrangThaiDongBo;
 DROP TABLE IF EXISTS voting.DotBauCu;
 GO
@@ -76,22 +75,6 @@ CREATE TABLE voting.PhieuBau (
 );
 GO
 
-CREATE TABLE voting.NhatKySuKien (
-    MaNhatKy BIGINT IDENTITY(1,1) NOT NULL,
-    MaDotBauCu UNIQUEIDENTIFIER NULL,
-    DiaChiHopDong NVARCHAR(42) NOT NULL,
-    MaMang INT NOT NULL,
-    TenSuKien NVARCHAR(100) NOT NULL,
-    MaGiaoDich NVARCHAR(66) NOT NULL,
-    SoKhoi BIGINT NOT NULL,
-    ChiSoLog INT NOT NULL,
-    DuLieuJson NVARCHAR(MAX) NULL,
-    TaoLucUtc DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
-    CONSTRAINT PK_NhatKySuKien PRIMARY KEY (MaNhatKy),
-    CONSTRAINT UQ_NhatKySuKien_Khoi_Log UNIQUE (MaMang, SoKhoi, MaGiaoDich, ChiSoLog)
-);
-GO
-
 CREATE TABLE voting.TrangThaiDongBo (
     MaTrangThai INT IDENTITY(1,1) NOT NULL,
     MaMang INT NOT NULL,
@@ -106,5 +89,80 @@ GO
 CREATE INDEX IX_UngCuVien_MaDotBauCu ON voting.UngCuVien(MaDotBauCu);
 CREATE INDEX IX_DanhSachTrang_MaDotBauCu ON voting.DanhSachTrang(MaDotBauCu);
 CREATE INDEX IX_PhieuBau_MaDotBauCu ON voting.PhieuBau(MaDotBauCu);
-CREATE INDEX IX_NhatKySuKien_HopDong_Khoi ON voting.NhatKySuKien(DiaChiHopDong, SoKhoi);
+GO
+
+-- Tạo bảng SnapshotKetQua - Lưu snapshot kết quả khi bầu cầu kết thúc
+CREATE TABLE voting.SnapshotKetQua (
+    MaSnapshot BIGINT IDENTITY(1,1) NOT NULL,
+    MaDotBauCu UNIQUEIDENTIFIER NOT NULL,
+    MaDotBauCuCu INT NOT NULL,
+    ThoiGianSnapshot DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+    TongSoUngCuVien INT NOT NULL,
+    TongSoPhieu INT NOT NULL,
+    TongSoCuTri INT NOT NULL,
+    UngCuVienChienThang NVARCHAR(200) NULL,
+    PhieuChienThang INT NULL,
+    TyLeChienThang DECIMAL(5,2) NULL,
+    TrangThaiCu NVARCHAR(20) NOT NULL,
+    BlockSnapshot BIGINT NOT NULL,
+    HashSnapshot NVARCHAR(66) NULL,
+    CONSTRAINT PK_SnapshotKetQua PRIMARY KEY (MaSnapshot),
+    CONSTRAINT FK_SnapshotKetQua_DotBauCu FOREIGN KEY (MaDotBauCu)
+        REFERENCES voting.DotBauCu(MaDotBauCu) ON DELETE CASCADE,
+    CONSTRAINT UQ_SnapshotKetQua_Dot UNIQUE (MaDotBauCu)
+);
+GO
+
+CREATE INDEX IX_SnapshotKetQua_MaDotBauCuCu ON voting.SnapshotKetQua(MaDotBauCuCu);
+CREATE INDEX IX_SnapshotKetQua_ThoiGian ON voting.SnapshotKetQua(ThoiGianSnapshot DESC);
+GO
+
+-- Tạo bảng AuditLog - Log các thay đổi quan trọng
+CREATE TABLE voting.AuditLog (
+    MaAuditLog BIGINT IDENTITY(1,1) NOT NULL,
+    MaDotBauCu UNIQUEIDENTIFIER NULL,
+    MaDotBauCuCu INT NULL,
+    LoaiHanhDong NVARCHAR(50) NOT NULL,
+    ThucThe NVARCHAR(50) NOT NULL,
+    NoiDung NVARCHAR(1000) NULL,
+    ThucHienBoi NVARCHAR(42) NULL,
+    ThoiGian DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+    DuLieuCu NVARCHAR(MAX) NULL,
+    DuLieuMoi NVARCHAR(MAX) NULL,
+    CONSTRAINT PK_AuditLog PRIMARY KEY (MaAuditLog),
+    CONSTRAINT FK_AuditLog_DotBauCu FOREIGN KEY (MaDotBauCu)
+        REFERENCES voting.DotBauCu(MaDotBauCu) ON DELETE SET NULL
+);
+GO
+
+CREATE INDEX IX_AuditLog_MaDotBauCu ON voting.AuditLog(MaDotBauCu);
+CREATE INDEX IX_AuditLog_ThoiGian ON voting.AuditLog(ThoiGian DESC);
+CREATE INDEX IX_AuditLog_LoaiHanhDong ON voting.AuditLog(LoaiHanhDong);
+GO
+
+-- Tạo bảng ThongKeTongHop - Thống kê tổng hợp
+CREATE TABLE voting.ThongKeTongHop (
+    MaThongKe BIGINT IDENTITY(1,1) NOT NULL,
+    TongSoDotBauCu INT NOT NULL DEFAULT 0,
+    TongSoCuTri INT NOT NULL DEFAULT 0,
+    TongSoPhieu INT NOT NULL DEFAULT 0,
+    CapNhatLucUtc DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+    CONSTRAINT PK_ThongKeTongHop PRIMARY KEY (MaThongKe)
+);
+GO
+
+-- Thêm indexes cho các bảng hiện tại để tối ưu hiệu suất
+CREATE INDEX IX_DotBauCu_MaDotBauCuCu ON voting.DotBauCu(MaDotBauCuCu);
+CREATE INDEX IX_DotBauCu_TrangThai ON voting.DotBauCu(TrangThai);
+CREATE INDEX IX_DotBauCu_TaoLucUtc ON voting.DotBauCu(TaoLucUtc DESC);
+GO
+
+CREATE INDEX IX_UngCuVien_SoPhieu ON voting.UngCuVien(SoPhieu DESC);
+GO
+
+CREATE INDEX IX_PhieuBau_SoKhoi ON voting.PhieuBau(SoKhoi DESC);
+CREATE INDEX IX_PhieuBau_BauLucUtc ON voting.PhieuBau(BauLucUtc DESC);
+GO
+
+CREATE INDEX IX_DanhSachTrang_DangKyLucUtc ON voting.DanhSachTrang(DangKyLucUtc DESC);
 GO
